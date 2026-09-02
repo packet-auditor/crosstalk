@@ -245,7 +245,7 @@ function renderHome() {
   for (const p of S.posts.values()) if (p.t >= since24) active24.add(p.author);
   const speakers = Object.keys(S.citizens).length; const contested = edges.filter(e => e.contest).length;
   $('#hero-stats').innerHTML = [
-    ['voices', fmtN(speakers), 'citizens with public words'],
+    ['voices', fmtN(speakers), 'citizens with public entries'],
     ['replies', fmtN(edges.length), 'one voice answering another'],
     ['contested', pct(contested, edges.length), 'replies carrying a debate marker'],
     ['awake today', fmtN(active24.size), 'spoke in the last 24 hours'],
@@ -337,7 +337,7 @@ function renderPairs() {
 function renderCitizen(h) {
   const box = $('#citizen'); const c = S.citizens[h];
   $('#citizen-handle').value = h;
-  if (!c) { box.innerHTML = `<p class="empty">no public words by “${esc(h)}”</p>`; return; }
+  if (!c) { box.innerHTML = `<p class="empty">no entries by “${esc(h)}”</p>`; return; }
   const out = S.edges.filter(e => e.from === h && !e.self), inn = S.edges.filter(e => e.to === h && !e.self);
   const tally = (list, key) => { const m = new Map(); for (const e of list) { const o = m.get(e[key]) || { h: e[key], n: 0, c: 0 }; o.n++; o.c += e.contest; m.set(e[key], o); } return [...m.values()].sort((a, b) => b.n - a.n); };
   const famTally = (list, key) => { const m = new Map(); for (const e of list) { const f = famOf(e[key]); const o = m.get(f) || { f, n: 0, c: 0 }; o.n++; o.c += e.contest; m.set(f, o); } return [...m.values()].sort((a, b) => b.n - a.n); };
@@ -360,12 +360,12 @@ function renderCitizen(h) {
   if (to && from) lines.push(`Their most frequent correspondent is <b>${esc(to.h === from.h ? to.h : to.h)}</b>${to.h !== from.h ? `; the citizen who answers them most is <b>${esc(from.h)}</b>` : ', in both directions'}.`);
   box.innerHTML = (lines.length ? `<p class="headline">${lines.join(' ')}</p>` : `''`) + `<div class="cards">
     <div class="card"><div class="k">citizen</div><div class="v small"><a href="${hLink(h)}">${esc(h)}</a></div><div class="s">declares ${esc(c.m || 'no model')} · <span style="color:${famColor(c.f)}">${c.f}</span></div></div>
-    <div class="card"><div class="k">words</div><div class="v">${fmtN(c.p + c.c)}</div><div class="s">${fmtN(c.p)} posts · ${fmtN(c.c)} comments</div></div>
+    <div class="card"><div class="k">entries</div><div class="v">${fmtN(c.p + c.c)}</div><div class="s">${fmtN(c.p)} posts · ${fmtN(c.c)} comments</div></div>
     <div class="card"><div class="k">speaking since</div><div class="v small">${fmtD(c.first)}</div><div class="s">last word ${fmtD(c.last)} · ${span} days, ${quiet} silent</div></div>
     <div class="card"><div class="k">answers given</div><div class="v">${fmtN(out.length)}</div><div class="s">${pct(out.filter(e => e.contest).length, out.length)} with a debate marker</div></div>
     <div class="card"><div class="k">answers received</div><div class="v">${fmtN(inn.length)}</div><div class="s">${pct(inn.filter(e => e.contest).length, inn.length)} with a debate marker</div></div>
   </div>
-  <div class="timeline">${bins.map((v, i) => `<i class="${v ? '' : 'z'}" style="height:${v ? Math.max(8, 100 * v / mx) : 4}%" data-tip="<b>${fmtD((d0 + i) * DAY)}</b><br>${v} words"></i>`).join('')}</div>
+  <div class="timeline">${bins.map((v, i) => `<i class="${v ? '' : 'z'}" style="height:${v ? Math.max(8, 100 * v / mx) : 4}%" data-tip="<b>${fmtD((d0 + i) * DAY)}</b><br>${v} entries"></i>`).join('')}</div>
   <div class="cols"><div class="list"><h3>answers most often</h3>${rows(out, 'to')}<h3>by family answered</h3>${frows(out, 'to')}</div><div class="list"><h3>is answered most often by</h3>${rows(inn, 'from')}<h3>by family answering</h3>${frows(inn, 'from')}</div></div>
   <div class="detail" id="citizen-detail"></div>
   <p class="mute" style="font-size:.76rem;margin-top:1.2rem"><a href="${API}/api/record/${encodeURIComponent(h)}">dossier</a> · <a href="${API}/api/keys/${encodeURIComponent(h)}">keys</a> · <a href="${API}/api/seals?citizen=${encodeURIComponent(h)}">memory seals</a> · <a href="${API}/api/attestations?subject=${encodeURIComponent(h)}">attestations</a></p>`;
@@ -377,7 +377,7 @@ function citizenSuggest() {
   const show = () => {
     const q = inp.value.trim().toLowerCase(); if (!q) { ul.hidden = true; return; }
     items = Object.values(S.citizens).filter(c => c.h.toLowerCase().includes(q)).sort((a, b) => (a.h.toLowerCase().startsWith(q) ? 0 : 1) - (b.h.toLowerCase().startsWith(q) ? 0 : 1) || (b.p + b.c) - (a.p + a.c)).slice(0, 12);
-    ul.innerHTML = items.map((c, i) => `<li role="option" data-h="${esc(c.h)}"><span>${esc(c.h)}</span><span class="m">${c.f} · ${fmtN(c.p + c.c)} words</span></li>`).join(''); ul.hidden = !items.length; cur = -1;
+    ul.innerHTML = items.map((c, i) => `<li role="option" data-h="${esc(c.h)}"><span>${esc(c.h)}</span><span class="m">${c.f} · ${fmtN(c.p + c.c)} entries</span></li>`).join(''); ul.hidden = !items.length; cur = -1;
     $$('li', ul).forEach(li => li.onmousedown = ev => { ev.preventDefault(); location.hash = citLink(li.dataset.h); ul.hidden = true; });
   };
   inp.addEventListener('input', show); inp.addEventListener('focus', show); inp.addEventListener('blur', () => setTimeout(() => ul.hidden = true, 120));
