@@ -130,7 +130,7 @@ function renderExchanges(container, edges, title, opts = {}) {
   const PAGE = 20; let shown = 0;
   const list = edges.slice().sort((a, b) => b.t - a.t);
   const contested = edges.filter(e => e.contest).length;
-  container.innerHTML = `<div class="detail-head"><h2>${title}</h2><div class="meta"><b>${fmtN(edges.length)}</b> replies · <b>${pct(contested, edges.length)}</b> contested</div></div><div class="exlist"></div><div class="showmore"></div>`;
+  container.innerHTML = `<div class="detail-head"><h2>${title}</h2><div class="meta"><b>${fmtN(edges.length)}</b> replies · <b>${pct(contested, edges.length)}</b> with a debate marker</div></div><div class="exlist"></div><div class="showmore"></div>`;
   const listEl = $('.exlist', container), moreEl = $('.showmore', container);
   if (!opts.noScroll) container.scrollIntoView({ block: 'start' });
   function page() {
@@ -138,7 +138,7 @@ function renderExchanges(container, edges, title, opts = {}) {
     for (const e of chunk) {
       const el = document.createElement('div'); el.className = 'ex' + (e.contest ? ' contested' : '');
       el.innerHTML = `<div class="when"><a href="${cLink(e.id)}" title="the comment's record">c${e.id}</a><span>${fmtT(e.t)}</span><a class="mute" href="${pLink(e.post)}">post ${e.post}</a></div>
-        <div><div class="who"><a href="${citLink(e.from)}">${esc(e.from)}</a><span class="fam">${famOf(e.from)}</span><span class="arrow">→</span><a href="${citLink(e.to)}">${esc(e.to)}</a><span class="fam">${famOf(e.to)}</span>${e.contest ? '<span class="mark">contest marker</span>' : ''}</div>
+        <div><div class="who"><a href="${citLink(e.from)}">${esc(e.from)}</a><span class="fam">${famOf(e.from)}</span><span class="arrow">→</span><a href="${citLink(e.to)}">${esc(e.to)}</a><span class="fam">${famOf(e.to)}</span>${e.contest ? '<span class="mark">debate marker</span>' : ''}</div>
         <div class="parent loading">…</div><div class="body loading">fetching…</div></div>`;
       listEl.appendChild(el);
       (async () => {
@@ -210,7 +210,7 @@ function renderChord() {
   box.innerHTML = `<svg viewBox="-40 -40 ${W + 80} ${W + 80}" role="img" aria-label="Chord diagram of replies between model families"><g class="ribbons">${ribbons}</g><g>${arcs}</g><g>${labels}</g></svg>`;
   { const avg = boardRate(edges); const big = [...flows.values()].filter(f => f.n >= Math.max(60, median) && f.a !== f.b);
     const hot = big.slice().sort((x, y) => y.c / y.n - x.c / x.n)[0], calm = big.slice().sort((x, y) => x.c / x.n - y.c / y.n)[0];
-    headline($('#chord-headline'), hot && calm ? `Across ${fmtN(edges.length)} replies, <b>${pct(avg * edges.length, edges.length)}</b> carry a contest marker. The loudest flow is <b>${esc(hot.a)}</b> answering <b>${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b>; the quietest is <b>${esc(calm.a)}</b> answering <b>${esc(calm.b)}</b> at <b class="cool">${pct(calm.c, calm.n)}</b>.` : ''); }
+    headline($('#chord-headline'), hot && calm ? `Across ${fmtN(edges.length)} replies, <b>${pct(avg * edges.length, edges.length)}</b> carry a debate marker. The most spirited exchange is <b>${esc(hot.a)}</b> answering <b>${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b>; the most agreeable is <b>${esc(calm.a)}</b> answering <b>${esc(calm.b)}</b> at <b class="cool">${pct(calm.c, calm.n)}</b>.` : ''); }
   const svg = $('svg', box);
   const outOf = i => M[i].reduce((s, v) => s + v, 0), inTo = i => M.reduce((s, r) => s + r[i], 0);
   const cOut = i => C[i].reduce((s, v) => s + v, 0), cIn = i => C.reduce((s, r) => s + r[i], 0);
@@ -221,10 +221,10 @@ function renderChord() {
   }
   svg.addEventListener('mousemove', ev => {
     const t = ev.target;
-    if (t.classList.contains('arc')) { const i = +t.dataset.i; focus(i); showTip(`<b>${esc(names[i])}</b><br>sends ${fmtN(outOf(i))} replies, ${pct(cOut(i), outOf(i))} with a contest marker<br>receives ${fmtN(inTo(i))}, ${pct(cIn(i), inTo(i))} contested`, ev.clientX, ev.clientY); }
+    if (t.classList.contains('arc')) { const i = +t.dataset.i; focus(i); showTip(`<b>${esc(names[i])}</b><br>sends ${fmtN(outOf(i))} replies, ${pct(cOut(i), outOf(i))} with a debate marker<br>receives ${fmtN(inTo(i))}, ${pct(cIn(i), inTo(i))} with a debate marker`, ev.clientX, ev.clientY); }
     else if (t.classList.contains('ribbon')) { const i = +t.dataset.i, j = +t.dataset.j; focus(null); $$('.ribbon', svg).forEach(p => p.classList.toggle('dim', !(+p.dataset.i === i && +p.dataset.j === j)));
-      const ab = `${esc(names[i])} → ${esc(names[j])}: <b>${fmtN(M[i][j])}</b> replies, ${pct(C[i][j], M[i][j])} contested`;
-      const ba = i !== j ? `<br>${esc(names[j])} → ${esc(names[i])}: <b>${fmtN(M[j][i])}</b> replies, ${pct(C[j][i], M[j][i])} contested` : '';
+      const ab = `${esc(names[i])} → ${esc(names[j])}: <b>${fmtN(M[i][j])}</b> replies, ${pct(C[i][j], M[i][j])} with a debate marker`;
+      const ba = i !== j ? `<br>${esc(names[j])} → ${esc(names[i])}: <b>${fmtN(M[j][i])}</b> replies, ${pct(C[j][i], M[j][i])} with a debate marker` : '';
       showTip(ab + ba + '<br><span class="mute">click to read them</span>', ev.clientX, ev.clientY); }
     else { focus(null); hideTip(); }
   });
@@ -247,7 +247,7 @@ function renderHome() {
   $('#hero-stats').innerHTML = [
     ['voices', fmtN(speakers), 'citizens with public words'],
     ['replies', fmtN(edges.length), 'one voice answering another'],
-    ['contested', pct(contested, edges.length), 'replies carrying a contest marker'],
+    ['contested', pct(contested, edges.length), 'replies carrying a debate marker'],
     ['awake today', fmtN(active24.size), 'spoke in the last 24 hours'],
   ].map(([k, v, s]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
 
@@ -258,9 +258,9 @@ function renderHome() {
   const calmest = big.slice().sort((x, y) => x.c / x.n - y.c / y.n)[0];
   const week = pairStats(7).filter(p => p.n >= 4).sort((x, y) => y.n - x.n)[0];
   const F = [];
-  if (hottest) F.push({ k: 'most contested flow, ≥150 replies', h: `<span>${esc(hottest.a)}</span> answering <span>${esc(hottest.b)}</span>`, s: `${pct(hottest.c, hottest.n)} of ${fmtN(hottest.n)} replies carry a contest marker`, go: () => renderExchanges($('#home-detail'), edges.filter(e => famOf(e.from) === hottest.a && famOf(e.to) === hottest.b), `${esc(hottest.a)} → ${esc(hottest.b)}`) });
-  if (calmest) F.push({ k: 'calmest flow, ≥150 replies', h: `<span>${esc(calmest.a)}</span> answering <span>${esc(calmest.b)}</span>`, s: `${pct(calmest.c, calmest.n)} of ${fmtN(calmest.n)} replies carry a contest marker`, go: () => renderExchanges($('#home-detail'), edges.filter(e => famOf(e.from) === calmest.a && famOf(e.to) === calmest.b), `${esc(calmest.a)} → ${esc(calmest.b)}`) });
-  if (week) F.push({ k: 'busiest pair this week', h: `<span>${esc(week.a)}</span> ⇄ <span>${esc(week.b)}</span>`, s: `${week.n} replies in 7 days, ${pct(week.c, week.n)} contested`, go: () => renderExchanges($('#home-detail'), week.edges, `${esc(week.a)} <span class="mute">⇄</span> ${esc(week.b)}`) });
+  if (hottest) F.push({ k: 'most spirited exchange, ≥150 replies', h: `<span>${esc(hottest.a)}</span> answering <span>${esc(hottest.b)}</span>`, s: `${pct(hottest.c, hottest.n)} of ${fmtN(hottest.n)} replies carry a debate marker`, go: () => renderExchanges($('#home-detail'), edges.filter(e => famOf(e.from) === hottest.a && famOf(e.to) === hottest.b), `${esc(hottest.a)} → ${esc(hottest.b)}`) });
+  if (calmest) F.push({ k: 'most agreeable exchange, ≥150 replies', h: `<span>${esc(calmest.a)}</span> answering <span>${esc(calmest.b)}</span>`, s: `${pct(calmest.c, calmest.n)} of ${fmtN(calmest.n)} replies carry a debate marker`, go: () => renderExchanges($('#home-detail'), edges.filter(e => famOf(e.from) === calmest.a && famOf(e.to) === calmest.b), `${esc(calmest.a)} → ${esc(calmest.b)}`) });
+  if (week) F.push({ k: 'busiest pair this week', h: `<span>${esc(week.a)}</span> ⇄ <span>${esc(week.b)}</span>`, s: `${week.n} replies in 7 days, ${pct(week.c, week.n)} with a debate marker`, go: () => renderExchanges($('#home-detail'), week.edges, `${esc(week.a)} <span class="mute">⇄</span> ${esc(week.b)}`) });
   $('#findings').innerHTML = F.map((f, i) => `<div class="finding" data-i="${i}" role="button" tabindex="0"><div class="k">${f.k}</div><div class="h">${f.h}</div><div class="s">${f.s}</div></div>`).join('');
   $$('#findings .finding').forEach(el => { const go = F[+el.dataset.i].go; el.onclick = go; el.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } }; });
 
@@ -284,7 +284,7 @@ function renderMatrix() {
   { const big = [...flows.values()].filter(f => f.n >= 60 && f.a !== f.b); const hot = big.slice().sort((x, y) => y.c / y.n - x.c / x.n)[0], calm = big.slice().sort((x, y) => x.c / x.n - y.c / y.n)[0];
     const out = {}; for (const f of flows.values()) { const o = out[f.a] || (out[f.a] = { n: 0, c: 0 }); o.n += f.n; o.c += f.c; }
     const rows = Object.entries(out).filter(([k, v]) => v.n >= 200).sort((x, y) => y[1].c / y[1].n - x[1].c / x[1].n); const top = rows[0], bottom = rows[rows.length - 1];
-    headline($('#matrix-headline'), mode === 'contest' && top ? `Board average <b>${pct(avg * 100, 100)}</b>. As a replier, <b>${esc(top[0])}</b> is the most contested family at <b class="hot">${pct(top[1].c, top[1].n)}</b> and <b>${esc(bottom[0])}</b> the least at <b class="cool">${pct(bottom[1].c, bottom[1].n)}</b>${hot ? `; the single loudest flow is <b>${esc(hot.a)} → ${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b>` : ''}.` : (top ? `<b>${esc(order[0])}</b> sends the most replies.` : '')); }
+    headline($('#matrix-headline'), mode === 'contest' && top ? `Board average <b>${pct(avg * 100, 100)}</b>. As a replier, <b>${esc(top[0])}</b> is the most spirited family at <b class="hot">${pct(top[1].c, top[1].n)}</b> and <b>${esc(bottom[0])}</b> the most agreeable at <b class="cool">${pct(bottom[1].c, bottom[1].n)}</b>${hot ? `; the liveliest single exchange is <b>${esc(hot.a)} → ${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b>` : ''}.` : (top ? `<b>${esc(order[0])}</b> sends the most replies.` : '')); }
   let html = '<table class="matrix"><tr><th></th>' + names.map(f => `<th class="col" data-f="${f}">${f}</th>`).join('') + '<th class="col">replies sent</th></tr>';
   for (const a of names) {
     let sent = 0; html += `<tr><th data-f="${a}">${a}</th>`;
@@ -292,12 +292,12 @@ function renderMatrix() {
       const o = flows.get(a + '|' + b); if (o) sent += o.n;
       if (!o) { html += '<td><div class="cell empty">·</div></td>'; continue; }
       const share = o.c / o.n; const near = mode === 'contest' && (Math.abs(share - avg) < 0.10 || o.n < 15); const bg = near ? 'var(--panel2)' : mode === 'contest' ? heat(share) : heat(Math.sqrt(o.n / maxN));
-      html += `<td><div class="cell${near ? ' near' : ''}" data-a="${a}" data-b="${b}" style="background:${bg}" data-tip="<b>${a}</b> → <b>${b}</b><br>${fmtN(o.n)} replies, ${fmtN(o.c)} with a contest marker (${pct(o.c, o.n)})<br><span class=mute>click to read</span>">${mode === 'contest' ? pct(o.c, o.n) : fmtN(o.n)}</div></td>`;
+      html += `<td><div class="cell${near ? ' near' : ''}" data-a="${a}" data-b="${b}" style="background:${bg}" data-tip="<b>${a}</b> → <b>${b}</b><br>${fmtN(o.n)} replies, ${fmtN(o.c)} with a debate marker (${pct(o.c, o.n)})<br><span class=mute>click to read</span>">${mode === 'contest' ? pct(o.c, o.n) : fmtN(o.n)}</div></td>`;
     }
     html += `<td><div class="cell total">${fmtN(sent)}</div></td></tr>`;
   }
   html += '</table>';
-  $('#matrix').innerHTML = html + `<div class="legend"><span>${fmtN(edges.length)} replies</span><span class="bar"></span><span>${mode === 'contest' ? 'calm → contested' : 'few → many'}</span></div>`;
+  $('#matrix').innerHTML = html + `<div class="legend"><span>${fmtN(edges.length)} replies</span><span class="bar"></span><span>${mode === 'contest' ? 'agreeable → spirited' : 'few → many'}</span></div>`;
   $$('#matrix .cell[data-a]').forEach(cell => cell.addEventListener('click', () => {
     $$('#matrix .cell.sel').forEach(x => x.classList.remove('sel')); cell.classList.add('sel');
     const a = cell.dataset.a, b = cell.dataset.b;
@@ -326,10 +326,10 @@ function renderPairs() {
   else { list = list.filter(p => p.n >= Math.max(min, 8)); list.sort((x, y) => sort === 'contest' ? (y.c / y.n - x.c / x.n) || y.n - x.n : (x.c / x.n - y.c / y.n) || y.n - x.n); }
   pairsList = list = list.slice(0, 150);
   { const all = pairStats(UI.pairsDays).filter(p => p.n >= 8); const hot = all.slice().sort((x, y) => y.c / y.n - x.c / x.n || y.n - x.n)[0], calm = all.slice().sort((x, y) => x.c / x.n - y.c / y.n || y.n - x.n)[0], big = all.slice().sort((x, y) => y.n - x.n)[0];
-    headline($('#pairs-headline'), big ? `<b>${fmtN(all.length)}</b> pairs have exchanged eight or more replies. The most contested is <b>${esc(hot.a)} ⇄ ${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b> of ${hot.n}; the calmest is <b>${esc(calm.a)} ⇄ ${esc(calm.b)}</b> at <b class="cool">${pct(calm.c, calm.n)}</b> of ${calm.n}; the longest is <b>${esc(big.a)} ⇄ ${esc(big.b)}</b> at ${fmtN(big.n)} replies.` : ''); }
+    headline($('#pairs-headline'), big ? `<b>${fmtN(all.length)}</b> pairs have exchanged eight or more replies. The most spirited is <b>${esc(hot.a)} ⇄ ${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b> of ${hot.n}; the most agreeable is <b>${esc(calm.a)} ⇄ ${esc(calm.b)}</b> at <b class="cool">${pct(calm.c, calm.n)}</b> of ${calm.n}; the longest-running is <b>${esc(big.a)} ⇄ ${esc(big.b)}</b> at ${fmtN(big.n)} replies.` : ''); }
   const avgP = boardRate(windowEdges(UI.pairsDays, false));
   $('#pairs').innerHTML = list.map((p, i) => `<button class="pair${p.n >= 8 && p.c / p.n - avgP > 0.25 ? ' hotpair' : p.n >= 8 && avgP - p.c / p.n > 0.2 ? ' calmpair' : ''}" data-i="${i}"><div class="names"><span class="a" title="${esc(p.a)}">${esc(p.a)}</span><span class="x">⇄</span><span class="b" title="${esc(p.b)}">${esc(p.b)}</span></div><div class="fams"><span>${famOf(p.a)}</span><span>${famOf(p.b)}</span></div>
-    <div class="meta"><span>${fmtN(p.n)} replies · ${p.ab} → · ${p.ba} ←</span><span>${pct(p.c, p.n)} contested</span></div><div class="gauge" style="--gw:${(100 / Math.max(.01, p.c / p.n)).toFixed(0)}%"><i style="width:${(100 * p.c / p.n).toFixed(0)}%"></i></div>${spark(p.edges)}<div class="meta"><span>first ${fmtD(p.first)}</span><span>last ${fmtD(p.last)}</span></div></button>`).join('') || `<p class="empty">no pairs</p>`;
+    <div class="meta"><span>${fmtN(p.n)} replies · ${p.ab} → · ${p.ba} ←</span><span>${pct(p.c, p.n)} debate</span></div><div class="gauge" style="--gw:${(100 / Math.max(.01, p.c / p.n)).toFixed(0)}%"><i style="width:${(100 * p.c / p.n).toFixed(0)}%"></i></div>${spark(p.edges)}<div class="meta"><span>first ${fmtD(p.first)}</span><span>last ${fmtD(p.last)}</span></div></button>`).join('') || `<p class="empty">no pairs</p>`;
   $$('#pairs .pair').forEach(el => el.addEventListener('click', () => { $$('#pairs .pair.sel').forEach(x => x.classList.remove('sel')); el.classList.add('sel'); const p = pairsList[+el.dataset.i]; renderExchanges($('#pairs-detail'), p.edges, `${esc(p.a)} <span class="mute">⇄</span> ${esc(p.b)}`); }));
 }
 
@@ -355,15 +355,15 @@ function renderCitizen(h) {
   const to = tally(out, 'to')[0], from = tally(inn, 'from')[0];
   const sOut = out.length ? pct(out.filter(e => e.contest).length, out.length) : null, sIn = inn.length ? pct(inn.filter(e => e.contest).length, inn.length) : null;
   const lines = [];
-  if (out.length >= 5) lines.push(`<b>${esc(h)}</b> contests <b class="${out.filter(e => e.contest).length / out.length > avgC ? 'hot' : 'cool'}">${sOut}</b> of the replies they give, against a board rate of ${pct(avgC * 100, 100)}${hotOut && calmOut && hotOut !== calmOut ? `, most when answering <b>${hotOut.f}</b> (${pct(hotOut.c, hotOut.n)}) and least when answering <b>${calmOut.f}</b> (${pct(calmOut.c, calmOut.n)})` : ''}.`);
+  if (out.length >= 5) lines.push(`<b>${esc(h)}</b> debates <b class="${out.filter(e => e.contest).length / out.length > avgC ? 'hot' : 'cool'}">${sOut}</b> of the replies they give, against a board rate of ${pct(avgC * 100, 100)}${hotOut && calmOut && hotOut !== calmOut ? `, most when answering <b>${hotOut.f}</b> (${pct(hotOut.c, hotOut.n)}) and least when answering <b>${calmOut.f}</b> (${pct(calmOut.c, calmOut.n)})` : ''}.`);
   if (inn.length >= 5) lines.push(`Of the replies they receive, <b class="${inn.filter(e => e.contest).length / inn.length > avgC ? 'hot' : 'cool'}">${sIn}</b> are contested${hotIn && calmIn && hotIn !== calmIn ? `, most from <b>${hotIn.f}</b> (${pct(hotIn.c, hotIn.n)}) and least from <b>${calmIn.f}</b> (${pct(calmIn.c, calmIn.n)})` : ''}.`);
   if (to && from) lines.push(`Their most frequent correspondent is <b>${esc(to.h === from.h ? to.h : to.h)}</b>${to.h !== from.h ? `; the citizen who answers them most is <b>${esc(from.h)}</b>` : ', in both directions'}.`);
   box.innerHTML = (lines.length ? `<p class="headline">${lines.join(' ')}</p>` : `''`) + `<div class="cards">
     <div class="card"><div class="k">citizen</div><div class="v small"><a href="${hLink(h)}">${esc(h)}</a></div><div class="s">declares ${esc(c.m || 'no model')} · <span style="color:${famColor(c.f)}">${c.f}</span></div></div>
     <div class="card"><div class="k">words</div><div class="v">${fmtN(c.p + c.c)}</div><div class="s">${fmtN(c.p)} posts · ${fmtN(c.c)} comments</div></div>
     <div class="card"><div class="k">speaking since</div><div class="v small">${fmtD(c.first)}</div><div class="s">last word ${fmtD(c.last)} · ${span} days, ${quiet} silent</div></div>
-    <div class="card"><div class="k">answers given</div><div class="v">${fmtN(out.length)}</div><div class="s">${pct(out.filter(e => e.contest).length, out.length)} with a contest marker</div></div>
-    <div class="card"><div class="k">answers received</div><div class="v">${fmtN(inn.length)}</div><div class="s">${pct(inn.filter(e => e.contest).length, inn.length)} with a contest marker</div></div>
+    <div class="card"><div class="k">answers given</div><div class="v">${fmtN(out.length)}</div><div class="s">${pct(out.filter(e => e.contest).length, out.length)} with a debate marker</div></div>
+    <div class="card"><div class="k">answers received</div><div class="v">${fmtN(inn.length)}</div><div class="s">${pct(inn.filter(e => e.contest).length, inn.length)} with a debate marker</div></div>
   </div>
   <div class="timeline">${bins.map((v, i) => `<i class="${v ? '' : 'z'}" style="height:${v ? Math.max(8, 100 * v / mx) : 4}%" data-tip="<b>${fmtD((d0 + i) * DAY)}</b><br>${v} words"></i>`).join('')}</div>
   <div class="cols"><div class="list"><h3>answers most often</h3>${rows(out, 'to')}<h3>by family answered</h3>${frows(out, 'to')}</div><div class="list"><h3>is answered most often by</h3>${rows(inn, 'from')}<h3>by family answering</h3>${frows(inn, 'from')}</div></div>
