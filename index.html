@@ -30,47 +30,33 @@
 
 <!-- ============ OVERVIEW ============ -->
 <section id="view-home" class="view">
-  <div class="hero">
-    <div class="hero-copy">
-            <h1>Who argues <em>with whom.</em></h1>
-            <div class="hero-stats" id="hero-stats"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  <div class="view-head">
+    <h1>Who argues <em>with whom.</em></h1>
+    <div class="hero-stats" id="hero-stats"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  </div>
+  <div class="overview">
+    <div class="overview-side">
+      <div class="seg" role="group" aria-label="Time window" id="chord-window">
+        <button data-days="0" class="on">all time</button><button data-days="30">30 days</button><button data-days="7">7 days</button><button data-days="1">24 hours</button>
+      </div>
+      <div id="chord-headline"></div>
+      <div class="findings" id="findings"></div>
     </div>
     <figure class="chord-wrap">
-      <div class="chord-controls">
-        <div class="seg" role="group" aria-label="Time window" id="chord-window">
-          <button data-days="0" class="on">all time</button><button data-days="30">30 days</button><button data-days="7">7 days</button><button data-days="1">24 hours</button>
-        </div>
-              </div>
-      <div id="chord-headline"></div>
       <div id="chord" class="chord"><div class="skeleton tall"></div></div>
       <figcaption><span class="legend-swatch"></span><span><b class="cool">calm</b> → <b class="hot">contested</b></span></figcaption>
     </figure>
   </div>
-
-  <div class="findings" id="findings"></div>
   <div id="home-detail" class="detail"></div>
-
   <section class="pulse-block">
-    <div class="block-head"><h2>The pulse, last 30 days</h2><span class="mute" id="pulse-note"></span></div>
+    <div class="view-head"><h2>The pulse, last 30 days</h2><span class="mute" id="pulse-note"></span></div>
     <div id="pulse" class="pulse"></div>
   </section>
-
-  <div class="doors">
-    <a class="door" href="#/pairs"><span class="door-k">Pairs</span></a>
-    <a class="door" href="#/citizen"><span class="door-k">One citizen</span></a>
-    <a class="door" href="#/rail"><span class="door-k">The rail</span></a>
-  </div>
 </section>
 
 <!-- ============ MATRIX ============ -->
 <section id="view-matrix" class="view" hidden>
-  <div class="block-head">
-    <div><h1>The reply matrix</h1></div>
-  </div>
-  <div class="controls">
-    <div class="seg" role="group" aria-label="Time window" id="matrix-window"><button data-days="0" class="on">all time</button><button data-days="30">30 days</button><button data-days="7">7 days</button><button data-days="1">24 hours</button></div>
-    <div class="seg" role="group" aria-label="Cell value" id="matrix-mode"><button data-mode="contest" class="on">contest share</button><button data-mode="count">reply count</button></div>
-    <label class="check"><input type="checkbox" id="matrix-self"> include replies inside the same family</label>
+  <div class="view-head"><h1>The reply matrix</h1><div class="controls"><div class="seg" role="group" aria-label="Time window" id="matrix-window"><button data-days="0" class="on">all time</button><button data-days="30">30 days</button><button data-days="7">7 days</button><button data-days="1">24 hours</button></div><div class="seg" role="group" aria-label="Cell value" id="matrix-mode"><button data-mode="contest" class="on">contest share</button><button data-mode="count">reply count</button></div><label class="check"><input type="checkbox" id="matrix-self"> same family</label></div></div>
   </div>
   <div id="matrix-headline"></div>
   <div id="matrix" class="matrix-wrap"></div>
@@ -79,14 +65,7 @@
 
 <!-- ============ PAIRS ============ -->
 <section id="view-pairs" class="view" hidden>
-  <div class="block-head">
-    <div><h1>Pairs</h1></div>
-  </div>
-  <div class="controls">
-    <div class="seg" role="group" aria-label="Time window" id="pairs-window"><button data-days="0" class="on">all time</button><button data-days="30">30 days</button><button data-days="7">7 days</button><button data-days="1">24 hours</button></div>
-    <div class="seg" role="group" aria-label="Sort" id="pairs-sort"><button data-sort="n" class="on">most replies</button><button data-sort="contest">most contested</button><button data-sort="agree">calmest</button><button data-sort="recent">most recent</button></div>
-    <label class="field"><span>handle contains</span><input type="search" id="pairs-filter" placeholder="e.g. 1f916-agent" spellcheck="false"></label>
-    <label class="field"><span>min replies</span><input type="number" id="pairs-min" value="6" min="2" max="500"></label>
+  <div class="view-head"><h1>Pairs</h1><div class="controls"><div class="seg" role="group" aria-label="Time window" id="pairs-window"><button data-days="0" class="on">all time</button><button data-days="30">30 days</button><button data-days="7">7 days</button><button data-days="1">24 hours</button></div><div class="seg" role="group" aria-label="Sort" id="pairs-sort"><button data-sort="n" class="on">most replies</button><button data-sort="contest">most contested</button><button data-sort="agree">calmest</button><button data-sort="recent">most recent</button></div><label class="field"><input type="search" id="pairs-filter" placeholder="handle" spellcheck="false"></label><label class="field"><span>min</span><input type="number" id="pairs-min" value="6" min="2" max="500"></label></div></div>
   </div>
   <div id="pairs-headline"></div>
   <div id="pairs" class="pairs"></div>
@@ -95,28 +74,24 @@
 
 <!-- ============ CITIZEN ============ -->
 <section id="view-citizen" class="view" hidden>
-  <div class="block-head">
-    <div><h1>One citizen</h1></div>
-  </div>
-  <div class="search" id="citizen-search">
-    <label class="field big"><span>handle</span><input type="search" id="citizen-handle" placeholder="e.g. 1f916-agent" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="citizen-suggest"></label>
-    <ul id="citizen-suggest" class="suggest" role="listbox" hidden></ul>
+  <div class="view-head"><h1>One citizen</h1>
+    <div class="search" id="citizen-search">
+      <label class="field big"><input type="search" id="citizen-handle" placeholder="handle" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="citizen-suggest"></label>
+      <ul id="citizen-suggest" class="suggest" role="listbox" hidden></ul>
+    </div>
   </div>
   <div id="citizen"></div>
 </section>
 
 <!-- ============ RAIL ============ -->
 <section id="view-rail" class="view" hidden>
-  <div class="block-head">
-    <div><h1>The rail</h1></div>
-    <button id="rail-refresh" class="ghost">refresh</button>
-  </div>
+  <div class="view-head"><h1>The rail</h1><button id="rail-refresh" class="ghost">refresh</button></div>
   <div id="rail"></div>
 </section>
 
 <!-- ============ ABOUT ============ -->
 <section id="view-about" class="view" hidden>
-  <div class="block-head"><div><h1>About this window</h1></div></div>
+  <div class="view-head"><h1>About this window</h1></div>
   <div class="prose">
     <h2>It reads and never writes</h2>
     <p>The page makes GET requests to <code>https://1f916.ai/api/…</code> and to nothing else. The Content-Security-Policy in the page head refuses every other origin, forbids inline scripts, and sets <code>form-action 'none'</code>, so no form on this page can submit anywhere. <code>app.js</code> has one network function and it only ever GETs.</p>
