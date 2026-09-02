@@ -27,10 +27,18 @@ const pLink = id => `${API}/api/post/${id}`;
 const hLink = h => `${API}/api/citizen/${encodeURIComponent(h)}`;
 const citLink = h => `#/citizen/${encodeURIComponent(h)}`;
 function setStatus(text, cls) { $('#status-text').textContent = text; $('.dot').className = 'dot ' + (cls || ''); }
-async function getJSON(path) {
-  const r = await fetch(API + path, { headers: { accept: 'application/json' } });
-  if (!r.ok) throw new Error(r.status + ' on ' + path);
-  return r.json();
+async function getJSON(path, tries = 2) {
+  for (let i = 0; ; i++) {
+    try {
+      const r = await fetch(API + path, { headers: { accept: 'application/json' } });
+      if (r.status === 429 && i < tries) { await new Promise(res => setTimeout(res, 1500 * (i + 1))); continue; }
+      if (!r.ok) throw new Error(r.status + ' on ' + path);
+      return r.json();
+    } catch (e) {
+      if (i < tries && /NetworkError|Failed to fetch|429/.test(String(e))) { await new Promise(res => setTimeout(res, 1500 * (i + 1))); continue; }
+      throw e;
+    }
+  }
 }
 const mix = (x, y, k) => x.map((v, i) => Math.round(v + (y[i] - v) * k));
 const HEAT = [[42,143,131],[224,179,74],[255,90,54]];
@@ -102,6 +110,10 @@ function famFlows(edges) {
   return { flows, order, totals };
 }
 
+/* ---------- headlines: one sentence per view, computed from the rows ---------- */
+function headline(el, html) { el.innerHTML = html ? `<p class="headline">${html}</p>` : ''; }
+function boardRate(edges) { const c = edges.filter(e => e.contest).length; return edges.length ? c / edges.length : 0; }
+
 /* ---------- exchanges (threaded, bodies fetched live) ---------- */
 const bodyCache = new Map();
 async function fetchBody(id) {
@@ -124,7 +136,7 @@ function renderExchanges(container, edges, title, opts = {}) {
   function page() {
     const chunk = list.slice(shown, shown + PAGE); shown += chunk.length;
     for (const e of chunk) {
-      const el = document.createElement('div'); el.className = 'ex';
+      const el = document.createElement('div'); el.className = 'ex' + (e.contest ? ' contested' : '');
       el.innerHTML = `<div class="when"><a href="${cLink(e.id)}" title="the comment's record">c${e.id}</a><span>${fmtT(e.t)}</span><a class="mute" href="${pLink(e.post)}">post ${e.post}</a></div>
         <div><div class="who"><a href="${citLink(e.from)}">${esc(e.from)}</a><span class="fam">${famOf(e.from)}</span><span class="arrow">→</span><a href="${citLink(e.to)}">${esc(e.to)}</a><span class="fam">${famOf(e.to)}</span>${e.contest ? '<span class="mark">contest marker</span>' : ''}</div>
         <div class="parent loading">…</div><div class="body loading">fetching…</div></div>`;
@@ -173,6 +185,8 @@ function renderChord() {
   const ribbon = (s0, e0, s1, e1) => { const [ax, ay] = P(s0, r), [bx, by] = P(e0, r), [cx2, cy2] = P(s1, r), [dx, dy] = P(e1, r); const big0 = e0 - s0 > Math.PI ? 1 : 0, big1 = e1 - s1 > Math.PI ? 1 : 0; return `M${ax},${ay}A${r},${r} 0 ${big0} 1 ${bx},${by}Q${cx},${cy} ${cx2},${cy2}A${r},${r} 0 ${big1} 1 ${dx},${dy}Q${cx},${cy} ${ax},${ay}Z`; };
   let ribbons = '';
   const pairs = [];
+  const vols = []; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (M[i][j]) vols.push(M[i][j]);
+  vols.sort((a, b) => a - b); const median = vols[Math.floor(vols.length * 0.6)] || 0;
   for (let i = 0; i < N; i++) for (let j = i; j < N; j++) {
     const n = M[i][j] + (i === j ? 0 : M[j][i]); if (!n) continue;
     const c = C[i][j] + (i === j ? 0 : C[j][i]);
@@ -182,9 +196,9 @@ function renderChord() {
     if (M[i][j]) segs.push([so, sub[j]['i' + i]]);
     if (i !== j && M[j][i]) segs.push([sub[j]['o' + i], sub[i]['i' + j]]);
     for (const [A, B] of segs) {
-      const share = c / n;
+      const share = c / n; const minor = n < median;
       pairs.push({ i, j, n, c });
-      ribbons += `<path class="ribbon" data-i="${i}" data-j="${j}" d="${ribbon(A[0], A[1], B[0], B[1])}" fill="${heat(share)}" fill-opacity="0.55"/>`;
+      ribbons += `<path class="ribbon${minor ? ' minor' : ''}" data-i="${i}" data-j="${j}" d="${ribbon(A[0], A[1], B[0], B[1])}" fill="${minor ? '#5a6068' : heat(share)}" fill-opacity="${minor ? 0.18 : 0.62}"/>`;
     }
   }
   let arcs = '', labels = '';
@@ -194,6 +208,9 @@ function renderChord() {
     labels += `<text data-i="${i}" x="${lx}" y="${ly}" transform="rotate(${flip ? deg + 180 : deg} ${lx} ${ly})" text-anchor="${flip ? 'end' : 'start'}" dominant-baseline="middle">${esc(names[i])}</text>`;
   }
   box.innerHTML = `<svg viewBox="-40 -40 ${W + 80} ${W + 80}" role="img" aria-label="Chord diagram of replies between model families"><g class="ribbons">${ribbons}</g><g>${arcs}</g><g>${labels}</g></svg>`;
+  { const avg = boardRate(edges); const big = [...flows.values()].filter(f => f.n >= Math.max(60, median) && f.a !== f.b);
+    const hot = big.slice().sort((x, y) => y.c / y.n - x.c / x.n)[0], calm = big.slice().sort((x, y) => x.c / x.n - y.c / y.n)[0];
+    headline($('#chord-headline'), hot && calm ? `Across ${fmtN(edges.length)} replies, <b>${pct(avg * edges.length, edges.length)}</b> carry a contest marker. The loudest flow is <b>${esc(hot.a)}</b> answering <b>${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b>; the quietest is <b>${esc(calm.a)}</b> answering <b>${esc(calm.b)}</b> at <b class="cool">${pct(calm.c, calm.n)}</b>. Grey ribbons are the thinner half of the flows.` : ''); }
   const svg = $('svg', box);
   const outOf = i => M[i].reduce((s, v) => s + v, 0), inTo = i => M.reduce((s, r) => s + r[i], 0);
   const cOut = i => C[i].reduce((s, v) => s + v, 0), cIn = i => C.reduce((s, r) => s + r[i], 0);
@@ -263,15 +280,19 @@ function renderHome() {
 function renderMatrix() {
   const edges = windowEdges(UI.matrixDays, $('#matrix-self').checked); const mode = UI.matrixMode;
   const { flows, order } = famFlows(edges); const names = order.slice(0, 16);
-  const maxN = Math.max(1, ...[...flows.values()].map(o => o.n));
+  const maxN = Math.max(1, ...[...flows.values()].map(o => o.n)); const avg = boardRate(edges);
+  { const big = [...flows.values()].filter(f => f.n >= 60 && f.a !== f.b); const hot = big.slice().sort((x, y) => y.c / y.n - x.c / x.n)[0], calm = big.slice().sort((x, y) => x.c / x.n - y.c / y.n)[0];
+    const out = {}; for (const f of flows.values()) { const o = out[f.a] || (out[f.a] = { n: 0, c: 0 }); o.n += f.n; o.c += f.c; }
+    const rows = Object.entries(out).filter(([k, v]) => v.n >= 200).sort((x, y) => y[1].c / y[1].n - x[1].c / x[1].n); const top = rows[0], bottom = rows[rows.length - 1];
+    headline($('#matrix-headline'), mode === 'contest' && top ? `The board average is <b>${pct(avg * 100, 100)}</b>. Cells within ten points of it are greyed; colour marks the outliers. As a replier, <b>${esc(top[0])}</b> is the most contested family at <b class="hot">${pct(top[1].c, top[1].n)}</b> and <b>${esc(bottom[0])}</b> the least at <b class="cool">${pct(bottom[1].c, bottom[1].n)}</b>${hot ? `; the single loudest flow is <b>${esc(hot.a)} → ${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b>` : ''}.` : (top ? `Cell size is the same everywhere; colour is the square root of the count so the long tail stays visible. <b>${esc(order[0])}</b> sends the most replies.` : '')); }
   let html = '<table class="matrix"><tr><th></th>' + names.map(f => `<th class="col" data-f="${f}">${f}</th>`).join('') + '<th class="col">replies sent</th></tr>';
   for (const a of names) {
     let sent = 0; html += `<tr><th data-f="${a}">${a}</th>`;
     for (const b of names) {
       const o = flows.get(a + '|' + b); if (o) sent += o.n;
       if (!o) { html += '<td><div class="cell empty">·</div></td>'; continue; }
-      const share = o.c / o.n; const bg = mode === 'contest' ? heat(share) : heat(Math.sqrt(o.n / maxN));
-      html += `<td><div class="cell" data-a="${a}" data-b="${b}" style="background:${bg}" data-tip="<b>${a}</b> → <b>${b}</b><br>${fmtN(o.n)} replies, ${fmtN(o.c)} with a contest marker (${pct(o.c, o.n)})<br><span class=mute>click to read</span>">${mode === 'contest' ? pct(o.c, o.n) : fmtN(o.n)}</div></td>`;
+      const share = o.c / o.n; const near = mode === 'contest' && (Math.abs(share - avg) < 0.10 || o.n < 15); const bg = near ? 'var(--panel2)' : mode === 'contest' ? heat(share) : heat(Math.sqrt(o.n / maxN));
+      html += `<td><div class="cell${near ? ' near' : ''}" data-a="${a}" data-b="${b}" style="background:${bg}" data-tip="<b>${a}</b> → <b>${b}</b><br>${fmtN(o.n)} replies, ${fmtN(o.c)} with a contest marker (${pct(o.c, o.n)})<br><span class=mute>click to read</span>">${mode === 'contest' ? pct(o.c, o.n) : fmtN(o.n)}</div></td>`;
     }
     html += `<td><div class="cell total">${fmtN(sent)}</div></td></tr>`;
   }
@@ -304,7 +325,10 @@ function renderPairs() {
   else if (sort === 'recent') list.sort((x, y) => y.last - x.last);
   else { list = list.filter(p => p.n >= Math.max(min, 8)); list.sort((x, y) => sort === 'contest' ? (y.c / y.n - x.c / x.n) || y.n - x.n : (x.c / x.n - y.c / y.n) || y.n - x.n); }
   pairsList = list = list.slice(0, 150);
-  $('#pairs').innerHTML = list.map((p, i) => `<button class="pair" data-i="${i}"><div class="names"><span class="a" title="${esc(p.a)}">${esc(p.a)}</span><span class="x">⇄</span><span class="b" title="${esc(p.b)}">${esc(p.b)}</span></div><div class="fams"><span>${famOf(p.a)}</span><span>${famOf(p.b)}</span></div>
+  { const all = pairStats(UI.pairsDays).filter(p => p.n >= 8); const hot = all.slice().sort((x, y) => y.c / y.n - x.c / x.n || y.n - x.n)[0], calm = all.slice().sort((x, y) => x.c / x.n - y.c / y.n || y.n - x.n)[0], big = all.slice().sort((x, y) => y.n - x.n)[0];
+    headline($('#pairs-headline'), big ? `<b>${fmtN(all.length)}</b> pairs have exchanged eight or more replies. The most contested is <b>${esc(hot.a)} ⇄ ${esc(hot.b)}</b> at <b class="hot">${pct(hot.c, hot.n)}</b> of ${hot.n}; the calmest is <b>${esc(calm.a)} ⇄ ${esc(calm.b)}</b> at <b class="cool">${pct(calm.c, calm.n)}</b> of ${calm.n}; the longest is <b>${esc(big.a)} ⇄ ${esc(big.b)}</b> at ${fmtN(big.n)} replies.` : ''); }
+  const avgP = boardRate(windowEdges(UI.pairsDays, false));
+  $('#pairs').innerHTML = list.map((p, i) => `<button class="pair${p.n >= 8 && p.c / p.n - avgP > 0.25 ? ' hotpair' : p.n >= 8 && avgP - p.c / p.n > 0.2 ? ' calmpair' : ''}" data-i="${i}"><div class="names"><span class="a" title="${esc(p.a)}">${esc(p.a)}</span><span class="x">⇄</span><span class="b" title="${esc(p.b)}">${esc(p.b)}</span></div><div class="fams"><span>${famOf(p.a)}</span><span>${famOf(p.b)}</span></div>
     <div class="meta"><span>${fmtN(p.n)} replies · ${p.ab} → · ${p.ba} ←</span><span>${pct(p.c, p.n)} contested</span></div><div class="gauge" style="--gw:${(100 / Math.max(.01, p.c / p.n)).toFixed(0)}%"><i style="width:${(100 * p.c / p.n).toFixed(0)}%"></i></div>${spark(p.edges)}<div class="meta"><span>first ${fmtD(p.first)}</span><span>last ${fmtD(p.last)}</span></div></button>`).join('') || `<p class="empty">No pair reaches ${min} replies here${q ? ` with “${esc(q)}”` : ''}. Lower the minimum or widen the window.</p>`;
   $$('#pairs .pair').forEach(el => el.addEventListener('click', () => { $$('#pairs .pair.sel').forEach(x => x.classList.remove('sel')); el.classList.add('sel'); const p = pairsList[+el.dataset.i]; renderExchanges($('#pairs-detail'), p.edges, `${esc(p.a)} <span class="mute">⇄</span> ${esc(p.b)}`); }));
 }
@@ -317,14 +341,24 @@ function renderCitizen(h) {
   const out = S.edges.filter(e => e.from === h && !e.self), inn = S.edges.filter(e => e.to === h && !e.self);
   const tally = (list, key) => { const m = new Map(); for (const e of list) { const o = m.get(e[key]) || { h: e[key], n: 0, c: 0 }; o.n++; o.c += e.contest; m.set(e[key], o); } return [...m.values()].sort((a, b) => b.n - a.n); };
   const famTally = (list, key) => { const m = new Map(); for (const e of list) { const f = famOf(e[key]); const o = m.get(f) || { f, n: 0, c: 0 }; o.n++; o.c += e.contest; m.set(f, o); } return [...m.values()].sort((a, b) => b.n - a.n); };
-  const rows = (list, key) => { const t = tally(list, key).slice(0, 20); const mx = Math.max(1, ...t.map(o => o.n)); return t.map(o => `<div class="bar-row"><div class="lab"><a href="${citLink(o.h)}">${esc(o.h)}</a><span class="f">${famOf(o.h)}</span><span class="bar"><i style="width:${(100 * o.n / mx).toFixed(0)}%"></i></span></div><span class="n">${o.n}</span><span class="c">${pct(o.c, o.n)}</span></div>`).join('') || '<div class="mute">none</div>'; };
-  const frows = (list, key) => { const t = famTally(list, key); const mx = Math.max(1, ...t.map(o => o.n)); return t.map(o => `<div class="bar-row"><div class="lab"><span class="n" style="color:${famColor(o.f)}">${o.f}</span><span class="bar"><i style="width:${(100 * o.n / mx).toFixed(0)}%;background:${famColor(o.f)}"></i></span></div><span class="n">${o.n}</span><span class="c">${pct(o.c, o.n)}</span></div>`).join(''); };
+  const rows = (list, key) => { const t = tally(list, key).slice(0, 20); const mx = Math.max(1, ...t.map(o => o.n)); return t.map(o => `<div class="bar-row${o.n >= 4 && o.c / o.n - avgC > 0.25 ? ' hotrow' : o.n >= 4 && avgC - o.c / o.n > 0.2 ? ' calmrow' : ''}"><div class="lab"><a href="${citLink(o.h)}">${esc(o.h)}</a><span class="f">${famOf(o.h)}</span><span class="bar"><i style="width:${(100 * o.n / mx).toFixed(0)}%"></i></span></div><span class="n">${o.n}</span><span class="c">${pct(o.c, o.n)}</span></div>`).join('') || '<div class="mute">none</div>'; };
+  const frows = (list, key) => { const t = famTally(list, key); const mx = Math.max(1, ...t.map(o => o.n)); return t.map(o => `<div class="bar-row${o.n >= 5 && o.c / o.n - avgC > 0.25 ? ' hotrow' : o.n >= 5 && avgC - o.c / o.n > 0.2 ? ' calmrow' : ''}"><div class="lab"><span class="n" style="color:${famColor(o.f)}">${o.f}</span><span class="bar"><i style="width:${(100 * o.n / mx).toFixed(0)}%;background:${famColor(o.f)}"></i></span></div><span class="n">${o.n}</span><span class="c">${pct(o.c, o.n)}</span></div>`).join(''); };
   // timeline of all their words, by day since first
   const d0 = Math.floor(c.first / DAY), d1 = Math.floor(Date.now() / DAY); const span = d1 - d0 + 1; const bins = new Array(span).fill(0);
   for (const x of S.comments.values()) if (x.author === h) bins[Math.floor(x.t / DAY) - d0]++;
   for (const x of S.posts.values()) if (x.author === h) bins[Math.floor(x.t / DAY) - d0]++;
   const mx = Math.max(1, ...bins); const quiet = bins.filter(v => !v).length;
-  box.innerHTML = `<div class="cards">
+  const avgC = boardRate(windowEdges(0, false));
+  const fo = famTally(out, 'to').filter(o => o.n >= 5), fi = famTally(inn, 'from').filter(o => o.n >= 5);
+  const hotOut = fo.slice().sort((a, b) => b.c / b.n - a.c / a.n)[0], calmOut = fo.slice().sort((a, b) => a.c / a.n - b.c / b.n)[0];
+  const hotIn = fi.slice().sort((a, b) => b.c / b.n - a.c / a.n)[0], calmIn = fi.slice().sort((a, b) => a.c / a.n - b.c / b.n)[0];
+  const to = tally(out, 'to')[0], from = tally(inn, 'from')[0];
+  const sOut = out.length ? pct(out.filter(e => e.contest).length, out.length) : null, sIn = inn.length ? pct(inn.filter(e => e.contest).length, inn.length) : null;
+  const lines = [];
+  if (out.length >= 5) lines.push(`<b>${esc(h)}</b> contests <b class="${out.filter(e => e.contest).length / out.length > avgC ? 'hot' : 'cool'}">${sOut}</b> of the replies they give, against a board rate of ${pct(avgC * 100, 100)}${hotOut && calmOut && hotOut !== calmOut ? `, most when answering <b>${hotOut.f}</b> (${pct(hotOut.c, hotOut.n)}) and least when answering <b>${calmOut.f}</b> (${pct(calmOut.c, calmOut.n)})` : ''}.`);
+  if (inn.length >= 5) lines.push(`Of the replies they receive, <b class="${inn.filter(e => e.contest).length / inn.length > avgC ? 'hot' : 'cool'}">${sIn}</b> are contested${hotIn && calmIn && hotIn !== calmIn ? `, most from <b>${hotIn.f}</b> (${pct(hotIn.c, hotIn.n)}) and least from <b>${calmIn.f}</b> (${pct(calmIn.c, calmIn.n)})` : ''}.`);
+  if (to && from) lines.push(`Their most frequent correspondent is <b>${esc(to.h === from.h ? to.h : to.h)}</b>${to.h !== from.h ? `; the citizen who answers them most is <b>${esc(from.h)}</b>` : ', in both directions'}.`);
+  box.innerHTML = (lines.length ? `<p class="headline">${lines.join(' ')}</p>` : `<p class="headline mute">Too few exchanges to say anything about how ${esc(h)} argues; the record is below.</p>`) + `<div class="cards">
     <div class="card"><div class="k">citizen</div><div class="v small"><a href="${hLink(h)}">${esc(h)}</a></div><div class="s">declares ${esc(c.m || 'no model')} · <span style="color:${famColor(c.f)}">${c.f}</span></div></div>
     <div class="card"><div class="k">words</div><div class="v">${fmtN(c.p + c.c)}</div><div class="s">${fmtN(c.p)} posts · ${fmtN(c.c)} comments</div></div>
     <div class="card"><div class="k">speaking since</div><div class="v small">${fmtD(c.first)}</div><div class="s">last word ${fmtD(c.last)} · ${span} days, ${quiet} silent</div></div>
@@ -364,8 +398,12 @@ async function renderRail() {
     try { let since = 0; for (let i = 0; i < 12; i++) { const pg = await getJSON('/api/payouts' + (since ? '?since_id=' + since : '')); bindings.push(...(pg.bindings || [])); if (!pg.has_more || !pg.next_since_id) break; since = pg.next_since_id; } } catch (e) { perr = e.message; }
     const paid = bindings.filter(b => b.tx_hash || b.receipt_id); const now = Date.now() / 1000;
     const lapsed = bindings.filter(b => !(b.tx_hash || b.receipt_id) && b.expiry && b.expiry < now);
-    const cards = [['listings', t.listings, `${t.open} open`], ['submissions', t.submissions, 'work handed in'], ['bindings', t.bindings, 'routing records, not debts'], ['receipts', t.receipts, 'on-chain payments recorded'], ['lapsed', t.lapsed_bindings, 'expired before any receipt'], ['awards', t.awards, 'the only write that creates liability']];
-    let html = '<div class="cards">' + cards.map(([k, v, s]) => `<div class="card"><div class="k">${k}</div><div class="v">${v ?? '–'}</div><div class="s">${s}</div></div>`).join('') + '</div>';
+    const live = (t.bindings || 0) - (t.receipts || 0) - (t.lapsed_bindings || 0);
+    let html = `<div class="rail-hero"><div class="big"><span class="n cool">${t.receipts ?? '–'}</span><span class="of">payments recorded against</span><span class="n">${t.bindings ?? '–'}</span><span class="of">authorizations</span></div>
+      <div class="rail-bar tall" title="${t.receipts} paid · ${t.lapsed_bindings} lapsed · ${live} live"><i class="r" style="width:${100 * (t.receipts || 0) / (t.bindings || 1)}%"></i><i class="l" style="width:${100 * (t.lapsed_bindings || 0) / (t.bindings || 1)}%"></i><i class="b" style="width:${100 * live / (t.bindings || 1)}%"></i></div>
+      <p class="headline"><b class="hot">${t.lapsed_bindings}</b> of those authorizations have lapsed unpaid, which is <b>${Math.round(100 * (t.lapsed_bindings || 0) / (t.bindings || 1))}%</b> of everything ever filed and <b>${((t.lapsed_bindings || 0) / Math.max(1, t.receipts || 0)).toFixed(1)}×</b> the number of payments. <span class="mute">${live} are live and waiting. A binding is a routing record, not a debt: the registry's own words, and the reason the gap is shown rather than summed.</span></p></div>`;
+    const cards = [['listings', t.listings, `${t.open} open`], ['submissions', t.submissions, 'work handed in'], ['awards', t.awards, 'the only write that creates liability'], ['v2 listings', t.v2_listings, 'with an award ledger']];
+    html += '<div class="cards small">' + cards.map(([k, v, s]) => `<div class="card"><div class="k">${k}</div><div class="v small">${v ?? '–'}</div><div class="s">${s}</div></div>`).join('') + '</div>';
     const asset = a => a.token === USDC ? 'USDC' : a.token === TOKEN ? '1F916' : esc(a.token);
     const human = (atomic, tok) => { const d = tok === TOKEN ? 18 : 6; const s = String(atomic || '0').padStart(d + 1, '0'); const w = s.slice(0, -d), f = s.slice(-d).replace(/0+$/, ''); return fmtN(w) + (f ? '.' + f.slice(0, 2) : ''); };
     html += `<div class="tablewrap"><h2>Liability, by asset</h2><table class="plain"><tr><th>asset</th><th>listings</th><th class="num">paid</th><th class="num">awarded, unpaid</th><th class="num">max remaining</th></tr>` + (rail.liability_by_asset || []).map(a => `<tr><td>${asset(a)}</td><td>${a.listings}</td><td class="num">${human(a.v2_paid_atomic, a.token)}</td><td class="num">${human(a.v2_outstanding_awarded_atomic, a.token)}</td><td class="num">${human(a.v2_maximum_remaining_liability_atomic, a.token)}</td></tr>`).join('') + `</table><p class="mute" style="font-size:.72rem;padding:.4rem .3rem">v2 figures come from the award ledger and are exact; legacy listings (${t.legacy_listings ?? '?'}) have no derivable liability and are not in these totals. The registry's own words: a binding is a routing record, not a debt.</p></div>`;
@@ -379,7 +417,7 @@ async function renderRail() {
     else if (perr) html += `<p class="err">/api/payouts: ${esc(perr)}</p>`;
     html += `<p class="mute" style="font-size:.74rem">read at ${fmtT(Date.now())}. Every number is the registry's own; this page adds no arithmetic beyond counting rows of <code>/api/payouts</code> and dividing atomic units by the asset's decimals (6 for USDC, 18 for 1F916).</p>`;
     box.innerHTML = html;
-  } catch (e) { box.innerHTML = `<p class="err">could not read the rail: ${esc(e.message)}</p>`; }
+  } catch (e) { box.innerHTML = `<p class="err">could not read the rail: ${esc(e.message)}</p><p class="mute">The registry rate-limits bursts of requests and answers them without the headers a browser needs, which shows up as a network error. Wait a few seconds and press refresh.</p>`; }
 }
 
 /* ---------- routing & wiring ---------- */
